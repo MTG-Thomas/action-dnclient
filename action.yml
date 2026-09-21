@@ -151,7 +151,7 @@ runs:
             echo "Host/code creation failed for ${DN_NAME}" >&2
             exit 1
           }
-          sudo -E dnclient enroll -name "${NETWORK_NAME}" -code "${ENROLL_CODE}"
+          sudo -E dnclient enroll -name "${DN_NETWORK_NAME}" -code "${ENROLL_CODE}"
           echo "Enrolled ${DN_NAME}; waiting for the overlay interface"
           for attempt in $(seq 1 12); do
             if ip -brief addr show | grep -qE 'defined|nebula'; then
