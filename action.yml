@@ -121,7 +121,7 @@ runs:
           }
           ENROLL_CODE="$(curl -fsSL -X POST -H "Authorization: Bearer ${DN_API_KEY}" \
             -H 'Content-Type: application/json' \
-            -d "{\"name\":\"${DN_NAME}\",\"networkID\":\"${DN_NETWORK_ID}\",\"roleID\":\"${DN_ROLE_ID\"}" \
+            -d "{\"name\":\"${DN_NAME}\",\"networkID\":\"${DN_NETWORK_ID}\",\"roleID\":\"${DN_ROLE_ID}\"}" \
             'https://api.defined.net/v2/host-and-enrollment-code' \
             | jq -r .data.enrollmentCode.code)"
           [ -n "${ENROLL_CODE}" ] && [ "${ENROLL_CODE}" != "null" ] || {
