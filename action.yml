@@ -93,30 +93,3 @@ runs:
         shell: bash
         run: |
           sudo -E dnctl start
-
-    post: |
-      #!/usr/bin/env bash
-      # Ephemeral-host teardown: runs even when the job fails. Mirrors the
-      # enrollment hostname logic above so the right host is deleted.
-      if [ "${{ inputs.dn-cleanup }}" != "true" ]; then
-        echo "dn-cleanup is not 'true'; keeping enrolled host."
-        exit 0
-      fi
-      if [ -n "${{ inputs.dn-hostname }}" ]; then
-        name="${{ inputs.dn-hostname }}"
-      else
-        name="github-action-$(hostname)"
-      fi
-      host_id="$(curl -fsSL -H "Authorization: Bearer ${{ inputs.dn-api-key }}" \
-        'https://api.defined.net/v1/hosts' \
-        | jq -r --arg name "${name}" \
-          '.data[]? // empty | select(.name == $name or .hostname == $name) | .id // empty' \
-        | head -n 1)"
-      if [ -z "${host_id}" ]; then
-        echo "No overlay host named ${name}; nothing to remove."
-        exit 0
-      fi
-      curl -fsSL -X DELETE -H "Authorization: Bearer ${{ inputs.dn-api-key }}" \
-        "https://api.defined.net/v1/hosts/${host_id}"
-      echo "Removed ephemeral overlay host ${name} (${host_id})."
-    post-shell: bash
