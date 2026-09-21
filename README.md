@@ -2,7 +2,7 @@
 
 This GitHub Action configures `dnclient` to join your [Defined Networking](https://defined.net) overlay network during your Action run.
 
-> MTG-Thomas fork of [quickvm/action-dnclient](https://github.com/quickvm/action-dnclient): nested checkout pinned to an actions/checkout v4 SHA served from our own [defined-systemd-units](https://github.com/MTG-Thomas/defined-systemd-units) fork pin, plus built-in ephemeral-host teardown (`dn-cleanup`, default true). After you add the step below, all other steps in your Action will be able to connect to other hosts on your overlay network. This Action uses [quickvm/defined-systemd-units](https://github.com/quickvm/defined-systemd-units) under the hood. See that project's [README](https://github.com/quickvm/defined-systemd-units/blob/master/README.md) for more details on how to configure `dnclient` with this Action.
+> MTG-Thomas fork of [quickvm/action-dnclient](https://github.com/quickvm/action-dnclient): nested checkout pinned to an actions/checkout v4 SHA served from our own [defined-systemd-units](https://github.com/MTG-Thomas/defined-systemd-units) fork pin. After you add the step below, all other steps in your Action will be able to connect to other hosts on your overlay network. This Action uses [quickvm/defined-systemd-units](https://github.com/quickvm/defined-systemd-units) under the hood. See that project's [README](https://github.com/quickvm/defined-systemd-units/blob/master/README.md) for more details on how to configure `dnclient` with this Action.
 
 ## Usage
 
@@ -37,11 +37,7 @@ dn-ip-address: "100.100.0.69"
 
 and you can store them as [GitHub Variables](https://docs.github.com/en/actions/learn-github-actions/variables).
 
-```yaml
-dn-cleanup: "true"
-```
-
-is optional (default `"true"`): when the job finishes — even on failure — the action deletes the host it enrolled via `DELETE /v1/hosts/{id}`, so ephemeral runners never accumulate. Set to `"false"` to keep the host. The API key needs `hosts:create`, `hosts:delete`, and `hosts:enroll` scopes.
+Callers running ephemeral hosts must delete the host they enrolled in an `if: always()` step (`DELETE /v1/hosts/{id}` looked up by the unique hostname), so runners never accumulate. The API key needs `hosts:create`, `hosts:delete`, and `hosts:enroll` scopes.
 
 Note: If you set a static hostname and IP address and you have more than one Action run the same Workflow at a same time you might see failures. Names and IP addresses have to be unique in Defined.net. Use the `dn-hostname` and `dn-ip-address` inputs at your own risk!
 
