@@ -93,3 +93,33 @@ runs:
         shell: bash
         run: |
           sudo -E dnctl start
+
+      - name: Enroll host into the overlay network
+        id: enroll-host
+        shell: bash
+        env:
+          DN_API_KEY: ${{ inputs.dn-api-key }}
+          DN_NETWORK_ID: ${{ inputs.dn-network-id }}
+          DN_ROLE_ID: ${{ inputs.dn-role-id }}
+          DN_HOSTNAME: ${{ inputs.dn-hostname }}
+        run: |
+          # The systemd units only run the client; enrollment is explicit
+          # so failures surface here instead of as a silent missing host.
+          if [ -z "${DN_HOSTNAME}" ]; then
+            export DN_NAME="github-action-$(hostname)"
+          else
+            export DN_NAME="${DN_HOSTNAME}"
+          fi
+          sudo -E dnctl enroll
+          echo "Enrolled ${DN_NAME}; waiting for the overlay interface"
+          for attempt in $(seq 1 12); do
+            if ip -brief addr show | grep -qE 'defined|nebula'; then
+              ip -brief addr show | grep -E 'defined|nebula'
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Overlay interface never appeared; dnclient units:" >&2
+          systemctl --no-pager list-units 'dnclient*' || true
+          journalctl --no-pager -u 'dnclient*' -n 30 || true
+          exit 1
