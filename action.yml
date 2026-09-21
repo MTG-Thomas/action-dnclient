@@ -148,9 +148,22 @@ runs:
             fi
             sleep 2
           done
+          # Dual-stack networks auto-assign IPv4 only when an address or
+          # prefix is requested; without it the host is IPv6-only and
+          # cannot reach IPv4 peers like the deploy target.
+          V4_CIDR="$(curl -fsSL -H "Authorization: Bearer ${DN_API_KEY}" \
+            "https://api.defined.net/v2/networks/${DN_NETWORK_ID}" \
+            | jq -r '[.data.cidrs[]? | select(contains("."))][0] // empty')"
+          if [ -n "${V4_CIDR}" ]; then
+            PAYLOAD="$(printf '{"name":"%s","networkID":"%s","roleID":"%s","ipAddresses":["%s"]}' \
+              "${DN_NAME}" "${DN_NETWORK_ID}" "${DN_ROLE_ID}" "${V4_CIDR}")"
+          else
+            PAYLOAD="$(printf '{"name":"%s","networkID":"%s","roleID":"%s"}' \
+              "${DN_NAME}" "${DN_NETWORK_ID}" "${DN_ROLE_ID}")"
+          fi
           ENROLL_CODE="$(curl -fsSL -X POST -H "Authorization: Bearer ${DN_API_KEY}" \
             -H 'Content-Type: application/json' \
-            -d "{\"name\":\"${DN_NAME}\",\"networkID\":\"${DN_NETWORK_ID}\",\"roleID\":\"${DN_ROLE_ID}\"}" \
+            -d "${PAYLOAD}" \
             'https://api.defined.net/v2/host-and-enrollment-code' \
             | jq -r .data.enrollmentCode.code)"
           [ -n "${ENROLL_CODE}" ] && [ "${ENROLL_CODE}" != "null" ] || {
