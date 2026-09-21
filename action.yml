@@ -91,7 +91,21 @@ runs:
       - name: Start dnclient.service unit
         id: start-dnclient-service-unit
         shell: bash
+        env:
+          DN_API_KEY: ${{ inputs.dn-api-key }}
+          DN_NETWORK_ID: ${{ inputs.dn-network-id }}
         run: |
+          # dnctl keys service/socket/config off DN_NETWORK_NAME (default
+          # "defined"); resolve the real name so start and enroll agree.
+          NETWORK_NAME="$(curl -fsSL -H "Authorization: Bearer ${DN_API_KEY}" \
+            "https://api.defined.net/v2/networks/${DN_NETWORK_ID}" \
+            | jq -r .data.name)"
+          [ -n "${NETWORK_NAME}" ] && [ "${NETWORK_NAME}" != "null" ] || {
+            echo "Could not resolve network name for ${DN_NETWORK_ID}" >&2
+            exit 1
+          }
+          export DN_NETWORK_NAME="${NETWORK_NAME}"
+          echo "DN_NETWORK_NAME=${NETWORK_NAME}" >> "${GITHUB_ENV}"
           sudo -E dnctl start
 
       - name: Enroll host into the overlay network
@@ -115,8 +129,9 @@ runs:
           fi
           # The daemon must be up before enroll can dial its socket;
           # systemctl returns once the start job is queued, not when ready.
+          # DN_NETWORK_NAME comes from the start step via GITHUB_ENV.
           for attempt in $(seq 1 15); do
-            if [ -S /var/run/defined/dnclient.sock ] || ls /var/run/defined/dnclient.*.sock >/dev/null 2>&1; then
+            if [ -S "/var/run/defined/dnclient.${DN_NETWORK_NAME}.sock" ]; then
               break
             fi
             if [ "${attempt}" -eq 15 ]; then
@@ -127,13 +142,6 @@ runs:
             fi
             sleep 2
           done
-          NETWORK_NAME="$(curl -fsSL -H "Authorization: Bearer ${DN_API_KEY}" \
-            "https://api.defined.net/v2/networks/${DN_NETWORK_ID}" \
-            | jq -r .data.name)"
-          [ -n "${NETWORK_NAME}" ] && [ "${NETWORK_NAME}" != "null" ] || {
-            echo "Could not resolve network name for ${DN_NETWORK_ID}" >&2
-            exit 1
-          }
           ENROLL_CODE="$(curl -fsSL -X POST -H "Authorization: Bearer ${DN_API_KEY}" \
             -H 'Content-Type: application/json' \
             -d "{\"name\":\"${DN_NAME}\",\"networkID\":\"${DN_NETWORK_ID}\",\"roleID\":\"${DN_ROLE_ID}\"}" \
