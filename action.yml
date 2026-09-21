@@ -103,6 +103,7 @@ runs:
           DN_ROLE_ID: ${{ inputs.dn-role-id }}
           DN_HOSTNAME: ${{ inputs.dn-hostname }}
         run: |
+          set -x
           # dnctl enroll targets the legacy v1 enrollment endpoint, which
           # v2 (certVersion 2) networks reject (ERR_CERT_VERSION_2_INCOMPATIBLE).
           # Create the host plus enrollment code through the v2 API directly
