@@ -103,14 +103,32 @@ runs:
           DN_ROLE_ID: ${{ inputs.dn-role-id }}
           DN_HOSTNAME: ${{ inputs.dn-hostname }}
         run: |
-          # The systemd units only run the client; enrollment is explicit
-          # so failures surface here instead of as a silent missing host.
+          # dnctl enroll targets the legacy v1 enrollment endpoint, which
+          # v2 (certVersion 2) networks reject (ERR_CERT_VERSION_2_INCOMPATIBLE).
+          # Create the host plus enrollment code through the v2 API directly
+          # and enroll dnclient with it, so failures surface here loudly.
           if [ -z "${DN_HOSTNAME}" ]; then
             export DN_NAME="github-action-$(hostname)"
           else
             export DN_NAME="${DN_HOSTNAME}"
           fi
-          sudo -E dnctl enroll
+          NETWORK_NAME="$(curl -fsSL -H "Authorization: Bearer ${DN_API_KEY}" \
+            "https://api.defined.net/v2/networks/${DN_NETWORK_ID}" \
+            | jq -r .data.name)"
+          [ -n "${NETWORK_NAME}" ] && [ "${NETWORK_NAME}" != "null" ] || {
+            echo "Could not resolve network name for ${DN_NETWORK_ID}" >&2
+            exit 1
+          }
+          ENROLL_CODE="$(curl -fsSL -X POST -H "Authorization: Bearer ${DN_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"name\":\"${DN_NAME}\",\"networkID\":\"${DN_NETWORK_ID}\",\"roleID\":\"${DN_ROLE_ID\"}" \
+            'https://api.defined.net/v2/host-and-enrollment-code' \
+            | jq -r .data.enrollmentCode.code)"
+          [ -n "${ENROLL_CODE}" ] && [ "${ENROLL_CODE}" != "null" ] || {
+            echo "Host/code creation failed for ${DN_NAME}" >&2
+            exit 1
+          }
+          sudo -E dnclient enroll -name "${NETWORK_NAME}" -code "${ENROLL_CODE}"
           echo "Enrolled ${DN_NAME}; waiting for the overlay interface"
           for attempt in $(seq 1 12); do
             if ip -brief addr show | grep -qE 'defined|nebula'; then
