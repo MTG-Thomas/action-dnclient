@@ -94,16 +94,17 @@ runs:
           }
           export DN_NETWORK_NAME="${NETWORK_NAME}"
           echo "DN_NETWORK_NAME=${NETWORK_NAME}" >> "${GITHUB_ENV}"
-          # Append directly: sudo may filter this variable out of
-          # write_config's environment, but the file is sourced by
-          # every dnctl call, so a direct append always sticks.
-          echo "DN_NETWORK_NAME=${NETWORK_NAME}" | sudo tee -a /etc/defined/dnctl >/dev/null
           if [ -z "${DN_HOSTNAME}" ]; then
             export DN_NAME="github-action-$(hostname)"
           else
             export DN_NAME="${DN_HOSTNAME}"
           fi
           sudo -E dnctl write_config
+          # Append after write_config (it refuses to overwrite an existing
+          # file): sudo may filter DN_NETWORK_NAME out of write_config's
+          # environment, but this direct append always sticks, and the file
+          # is sourced by every dnctl call.
+          echo "DN_NETWORK_NAME=${NETWORK_NAME}" | sudo tee -a /etc/defined/dnctl >/dev/null
 
       - name: Start dnclient.service unit
         id: start-dnclient-service-unit
@@ -134,7 +135,7 @@ runs:
           fi
           # The daemon must be up before enroll can dial its socket;
           # systemctl returns once the start job is queued, not when ready.
-          # DN_NETWORK_NAME comes from the start step via GITHUB_ENV.
+          # DN_NETWORK_NAME comes from the configure step via GITHUB_ENV.
           for attempt in $(seq 1 15); do
             if [ -S "/var/run/defined/dnclient.${DN_NETWORK_NAME}.sock" ]; then
               break
