@@ -94,6 +94,10 @@ runs:
           }
           export DN_NETWORK_NAME="${NETWORK_NAME}"
           echo "DN_NETWORK_NAME=${NETWORK_NAME}" >> "${GITHUB_ENV}"
+          # Append directly: sudo may filter this variable out of
+          # write_config's environment, but the file is sourced by
+          # every dnctl call, so a direct append always sticks.
+          echo "DN_NETWORK_NAME=${NETWORK_NAME}" | sudo tee -a /etc/defined/dnctl >/dev/null
           if [ -z "${DN_HOSTNAME}" ]; then
             export DN_NAME="github-action-$(hostname)"
           else
