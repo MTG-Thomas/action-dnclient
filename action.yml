@@ -81,6 +81,19 @@ runs:
           if [ -n "${{ inputs.dn-ip-address }}" ]; then
             export DN_IP_ADDRESS="${{ inputs.dn-ip-address }}"
           fi
+          # dnctl keys service/socket/config off DN_NETWORK_NAME (default
+          # "defined"). Resolve it here so write_config persists it to
+          # /etc/defined/dnctl, which every dnctl call sources — immune to
+          # sudo environment filtering that broke per-step exports.
+          NETWORK_NAME="$(curl -fsSL -H "Authorization: Bearer ${DN_API_KEY}" \
+            "https://api.defined.net/v2/networks/${DN_NETWORK_ID}" \
+            | jq -r .data.name)"
+          [ -n "${NETWORK_NAME}" ] && [ "${NETWORK_NAME}" != "null" ] || {
+            echo "Could not resolve network name for ${DN_NETWORK_ID}" >&2
+            exit 1
+          }
+          export DN_NETWORK_NAME="${NETWORK_NAME}"
+          echo "DN_NETWORK_NAME=${NETWORK_NAME}" >> "${GITHUB_ENV}"
           if [ -z "${DN_HOSTNAME}" ]; then
             export DN_NAME="github-action-$(hostname)"
           else
@@ -91,21 +104,9 @@ runs:
       - name: Start dnclient.service unit
         id: start-dnclient-service-unit
         shell: bash
-        env:
-          DN_API_KEY: ${{ inputs.dn-api-key }}
-          DN_NETWORK_ID: ${{ inputs.dn-network-id }}
         run: |
-          # dnctl keys service/socket/config off DN_NETWORK_NAME (default
-          # "defined"); resolve the real name so start and enroll agree.
-          NETWORK_NAME="$(curl -fsSL -H "Authorization: Bearer ${DN_API_KEY}" \
-            "https://api.defined.net/v2/networks/${DN_NETWORK_ID}" \
-            | jq -r .data.name)"
-          [ -n "${NETWORK_NAME}" ] && [ "${NETWORK_NAME}" != "null" ] || {
-            echo "Could not resolve network name for ${DN_NETWORK_ID}" >&2
-            exit 1
-          }
-          export DN_NETWORK_NAME="${NETWORK_NAME}"
-          echo "DN_NETWORK_NAME=${NETWORK_NAME}" >> "${GITHUB_ENV}"
+          # DN_NETWORK_NAME was persisted to /etc/defined/dnctl by the
+          # configure step; dnctl sources it, so no env dependence here.
           sudo -E dnctl start
 
       - name: Enroll host into the overlay network
