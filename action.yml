@@ -113,6 +113,20 @@ runs:
           else
             export DN_NAME="${DN_HOSTNAME}"
           fi
+          # The daemon must be up before enroll can dial its socket;
+          # systemctl returns once the start job is queued, not when ready.
+          for attempt in $(seq 1 15); do
+            if [ -S /var/run/defined/dnclient.sock ] || ls /var/run/defined/dnclient.*.sock >/dev/null 2>&1; then
+              break
+            fi
+            if [ "${attempt}" -eq 15 ]; then
+              echo "dnclient socket never appeared; units:" >&2
+              systemctl --no-pager list-units 'dnclient*' || true
+              journalctl --no-pager -u 'dnclient*' -n 30 || true
+              exit 1
+            fi
+            sleep 2
+          done
           NETWORK_NAME="$(curl -fsSL -H "Authorization: Bearer ${DN_API_KEY}" \
             "https://api.defined.net/v2/networks/${DN_NETWORK_ID}" \
             | jq -r .data.name)"
